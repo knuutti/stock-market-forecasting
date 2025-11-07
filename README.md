@@ -34,3 +34,7 @@ This repository contains our course project for **Advanced Data Analysis and Mac
 ## Course
 
 Advanced Data Analysis and Machine Learning
+
+---
+
+*This README was created with the assistance of generative AI.*
