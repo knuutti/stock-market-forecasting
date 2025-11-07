@@ -31,16 +31,6 @@ This repository contains our course project for **Advanced Data Analysis and Mac
 - **Period**: January 1, 2006 to January 1, 2018
 - **Format**: CSV file with historical price data
 
-## Files
-
-- `IBM_2006-01-01_to_2018-01-01.csv` - Historical IBM stock price data
-- `visu.ipynb` - Jupyter notebook with analysis and visualizations
-- `README.md` - Project documentation
-
-## Usage
-
-Open and run the `visu.ipynb` notebook to explore the analysis and forecasting models.
-
 ## Course
 
 Advanced Data Analysis and Machine Learning
