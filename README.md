@@ -37,4 +37,6 @@ Advanced Data Analysis and Machine Learning
 
 ---
 
+For running the project locally, install dependencies with `pip install -r requirements.txt`. If you want to run PyTorch with GPU, you need a `torch` version with CUDA support.
+
 *This README was created with the assistance of generative AI.*
