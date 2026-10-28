@@ -12,7 +12,7 @@ def get_device():
 # Training function
 def train_model(model, train_loader, val_loader, optimizer, criterion, scheduler, num_epochs, type, device=None, save_path=None):
     if save_path is None:
-        save_path = f'models/best_model_{type}.pth'
+        save_path = f"models/rolling_{type.replace(' ', '_')}.pth"
     if device is None:
         device = get_device()
     model.to(device)

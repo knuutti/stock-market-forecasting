@@ -138,3 +138,33 @@ def plot_prediction(past_data, true_future, prediction, model_name, horizon_labe
     plt.ylabel('Price')
     plt.legend()
     plt.show()
+
+
+def plot_forecast_comparison(past_dates, past_data, future_dates, true_future, forecasts, horizon_label, save_path=None):
+    # forecasts: {model_name: forecast over the horizon}
+    colors = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4']
+
+    # Start every future line at the last observed value so that it joins the history
+    x_future = np.insert(np.asarray(future_dates), 0, past_dates[-1])
+
+    fig, ax = plt.subplots(figsize=(16, 8), dpi=100)
+    ax.plot(past_dates, past_data, color='#0b0b0b', linewidth=2, label='Actual')
+    ax.plot(x_future, np.insert(true_future, 0, past_data[-1]), color='#0b0b0b', linewidth=2)
+    for (model_name, forecast), color in zip(forecasts.items(), colors):
+        ax.plot(x_future, np.insert(np.ravel(forecast), 0, past_data[-1]), color=color, linewidth=2, label=model_name)
+    ax.axvline(past_dates[-1], color='#898781', linestyle='--', linewidth=1)
+    ax.annotate('Forecast origin', xy=(past_dates[-1], 1), xycoords=('data', 'axes fraction'),
+                xytext=(-6, -6), textcoords='offset points', ha='right', va='top', fontsize=12, color='#52514e')
+
+    ax.set_title(f'IBM opening price: {horizon_label} forecasts from {np.datetime_as_string(past_dates[-1], unit="D")}', fontsize=16)
+    ax.set_xlabel('Date', fontsize=14)
+    ax.set_ylabel('Opening price (USD)', fontsize=14)
+    ax.tick_params(labelsize=12)
+    ax.grid(color='#e5e4e0', linewidth=0.8)
+    for side in ['top', 'right']:
+        ax.spines[side].set_visible(False)
+    ax.legend(loc='best', fontsize=12, frameon=False)
+    fig.tight_layout()
+    if save_path is not None:
+        fig.savefig(save_path, dpi=100, facecolor='white')
+    plt.show()

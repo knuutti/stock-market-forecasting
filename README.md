@@ -2,7 +2,9 @@
 
 Forecasting IBM daily opening prices (2006–2017) 5 and 21 trading days ahead, comparing a naive baseline and an STL + ARIMA model with recurrent and Transformer neural networks.
 
-![Forecasts against actual prices](assets/forecast_comparison.png)
+![21-day forecasts of the five models against the actual IBM opening price](assets/forecast_comparison.png)
+
+*21-day forecasts of all five models for one test window (forecast origin 2015-09-17), with the preceding 63-day input window. The window was chosen so that each model's error on it is close to that model's median over the test windows.*
 
 ## Results
 
@@ -39,6 +41,7 @@ None of the models beats the naive forecast (repeating the last observed price) 
 | `visualization.py` | Plotting helpers |
 | `data/` | IBM daily price data |
 | `models/` | Trained model weights |
+| `assets/` | Figure used in this README |
 
 ## How to run
 
@@ -51,6 +54,6 @@ By default the notebook loads the trained weights from `models/`. Set `TRAIN = T
 
 ## Context
 
-Course project for *Advanced Data Analysis and Machine Learning*, LUT University. Team: Eetu Knutars, Eetu Peltola and Eero Ryhänen.
+Course project for *Advanced Data Analysis and Machine Learning*, LUT University. Team: Eetu Knutars, Eetu Peltola and Eero Ryhänen. Released under the [MIT License](LICENSE).
 
 *This README was written with the assistance of generative AI.*
