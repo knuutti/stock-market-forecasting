@@ -1,42 +1,56 @@
 # Stock Market Forecasting
 
-A comprehensive time series analysis project for forecasting IBM stock prices using various statistical and machine learning methods.
+Forecasting IBM daily opening prices (2006–2017) 5 and 21 trading days ahead, comparing a naive baseline and an STL + ARIMA model with recurrent and Transformer neural networks.
 
-## Project Overview
+![Forecasts against actual prices](assets/forecast_comparison.png)
 
-This repository contains our course project for **Advanced Data Analysis and Machine Learning**. The project explores different time series analysis techniques to forecast IBM stock prices, covering the entire data science pipeline from preprocessing to advanced modeling.
+## Results
 
-## Objectives
+| Model | RMSE, 5-day horizon | RMSE, 21-day horizon |
+| --- | --- | --- |
+| STL + ARIMA | 6.876 | 10.866 |
+| Naive (last value) | 2.999 | 5.623 |
+| RNN | 5.429 | 15.274 |
+| LSTM | 7.800 | 20.583 |
+| Transformer | 4.920 | 12.071 |
 
-- Analyze IBM stock price data (2006-2018) using time series methods
-- Understand and implement the complete time series analysis process
-- Compare performance between baseline and advanced forecasting models
-- Explore decomposition of trend, seasonality, and residual components
+RMSE in USD, pooled over all forecast steps of 578 rolling test windows (forecast origins from 2015-08-17 to 2017-11-29, the last 20 % of the data). Every model is scored on the same windows. MAE is reported in the notebook.
 
-## Methodology
+None of the models beats the naive forecast (repeating the last observed price) on either horizon. Of the neural networks, the Transformer does best.
 
-### Data Processing
-- Time series preprocessing and cleaning
-- Trend, seasonality, and residual decomposition
-- Feature engineering for time series data
+## Approach
 
-### Modeling Approaches
-- **Baseline Methods**: Simple statistical models for benchmarking
-- **Statistical Methods**: Traditional time series forecasting techniques
-- **Deep Learning Models**: Advanced neural network approaches
+- **Preprocessing.** Forward-filling of missing values, STL decomposition into trend, seasonality and residuals, autocorrelation and return analysis.
+- **Features.** Daily high, low, close and volume; technical indicators RSI, Bollinger band width, ATR, 50-day SMA and the distance from it, and on-balance volume; sine/cosine encodings of weekday and month.
+- **Naive baseline.** The last observed opening price, repeated over the horizon.
+- **Statistical baseline.** STL decomposition with auto-ARIMA models for the trend and residual components; the seasonal component repeats the last observed cycle. The ARIMA orders are chosen once on pre-test data, and STL and ARIMA are refitted on the history up to each test origin.
+- **Neural models.** RNN, LSTM and Transformer encoder in PyTorch, trained on 63-day sliding windows with a chronological train/validation/test split. A gap between the splits keeps target windows from overlapping, and scalers are fitted on the training data only.
 
-## Dataset
+## Repository structure
 
-- **Source**: IBM stock price data
-- **Period**: January 1, 2006 to January 1, 2018
-- **Format**: CSV file with historical price data
+| File | Purpose |
+| --- | --- |
+| `project.ipynb` | Full analysis with results and plots |
+| `data_preprocessing.py` | Feature engineering, windowing and splits |
+| `model_definitions.py` | RNN, LSTM and Transformer models |
+| `training.py` | Training loop and test-set prediction |
+| `evaluation.py` | Naive baseline and error metrics |
+| `arima_forecasting.py` | STL + ARIMA baseline |
+| `visualization.py` | Plotting helpers |
+| `data/` | IBM daily price data |
+| `models/` | Trained model weights |
 
-## Course
+## How to run
 
-Advanced Data Analysis and Machine Learning
+```bash
+pip install -r requirements.txt notebook
+jupyter notebook project.ipynb
+```
 
----
+By default the notebook loads the trained weights from `models/`. Set `TRAIN = True` in the first cell to retrain the neural networks (about 22 minutes on a CPU). For GPU training, install a PyTorch build with CUDA support.
 
-For running the project locally, install dependencies with `pip install -r requirements.txt`. If you want to run PyTorch with GPU, you need a `torch` version with CUDA support.
+## Context
 
-*This README was created with the assistance of generative AI.*
+Course project for *Advanced Data Analysis and Machine Learning*, LUT University. Team: Eetu Knutars, Eetu Peltola and Eero Ryhänen.
+
+*This README was written with the assistance of generative AI.*
