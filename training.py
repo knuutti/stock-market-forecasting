@@ -1,7 +1,8 @@
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from sklearn.metrics import root_mean_squared_error, mean_absolute_error
+
+from evaluation import forecast_metrics
 
 
 def get_device():
@@ -9,7 +10,9 @@ def get_device():
 
 
 # Training function
-def train_model(model, train_loader, val_loader, optimizer, criterion, scheduler, num_epochs, type, device=None):
+def train_model(model, train_loader, val_loader, optimizer, criterion, scheduler, num_epochs, type, device=None, save_path=None):
+    if save_path is None:
+        save_path = f'models/best_model_{type}.pth'
     if device is None:
         device = get_device()
     model.to(device)
@@ -47,7 +50,7 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, scheduler
         # Save the best model
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
-            torch.save(model.state_dict(), f'models/best_model_{type}.pth')
+            torch.save(model.state_dict(), save_path)
 
         all_train_losses.append(avg_train_loss)
         all_val_losses.append(avg_val_loss)
@@ -63,7 +66,7 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, scheduler
     plt.show()
 
     # Load the best model
-    model.load_state_dict(torch.load(f'models/best_model_{type}.pth'))
+    model.load_state_dict(torch.load(save_path, map_location=device, weights_only=True))
     return model
 
 
@@ -89,8 +92,7 @@ def evaluate_model(model, test_loader, scaler_y, device=None):
     real_actuals = scaler_y.inverse_transform(actuals)
 
     # Print evaluation metrics
-    rmse = root_mean_squared_error(real_actuals, real_predictions)
-    mae = mean_absolute_error(real_actuals, real_predictions)
+    rmse, mae = forecast_metrics(real_actuals, real_predictions)
     print(f"Test RMSE: {rmse:.4f}")
     print(f"Test MAE: {mae:.4f}")
 

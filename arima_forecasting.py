@@ -1,6 +1,9 @@
+import warnings
+
 import numpy as np
 import pandas as pd
 import pmdarima as pm
+from joblib import Parallel, delayed
 from sklearn.metrics import root_mean_squared_error, mean_absolute_error, r2_score
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.seasonal import STL
@@ -110,3 +113,52 @@ def fit_stl_arima_forecast(train_series, test_series, period=252, seasonal=13):
     print(f"R2 Score (Hybrid): {r2_hybrid}")
 
     return total_forecast, trend_forecast, seasonal_forecast, resid_forecast, best_order_resid, best_order_trend
+
+
+def select_stl_arima_orders(train_series, period=252, seasonal=13):
+    # Choose the ARIMA orders once, on data before the test period only
+    res_train = STL(train_series, period=period, seasonal=seasonal, robust=True).fit()
+    order_resid = pm.auto_arima(res_train.resid,
+                                start_p=1, start_q=1,
+                                test='adf',
+                                max_p=5, max_q=5,
+                                m=7, seasonal=True,
+                                d=None, D=0,
+                                trace=False,
+                                error_action='ignore',
+                                suppress_warnings=True,
+                                stepwise=True).order
+    order_trend = pm.auto_arima(res_train.trend,
+                                start_p=1, start_q=1,
+                                d=1,
+                                max_p=3, max_q=3,
+                                seasonal=False,
+                                trace=False,
+                                error_action='ignore',
+                                suppress_warnings=True,
+                                stepwise=True).order
+    print(f"Best Order for Residuals: {order_resid}")
+    print(f"Best Order for Trend: {order_trend}")
+    return order_resid, order_trend
+
+
+def stl_arima_forecast_from_origin(history, n_future, order_resid, order_trend, period=252, seasonal=13):
+    # STL is two-sided, so it is refitted on the history up to the origin only
+    res = STL(history, period=period, seasonal=seasonal, robust=True).fit()
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        resid_forecast = ARIMA(res.resid, order=order_resid).fit().forecast(steps=n_future)
+        trend_forecast = ARIMA(res.trend, order=order_trend).fit().forecast(steps=n_future)
+    # Seasonal forecast repeats the last observed seasonal cycle
+    seasonal_forecast = np.asarray(res.seasonal)[-period:][:n_future]
+    return np.asarray(trend_forecast) + seasonal_forecast + np.asarray(resid_forecast)
+
+
+def rolling_stl_arima_forecast(series, origins, n_future, period=252, seasonal=13, n_jobs=-1):
+    series = np.asarray(series, dtype=float)
+    order_resid, order_trend = select_stl_arima_orders(series[:origins[0] + 1], period, seasonal)
+    forecasts = Parallel(n_jobs=n_jobs)(
+        delayed(stl_arima_forecast_from_origin)(series[:t + 1], n_future, order_resid, order_trend, period, seasonal)
+        for t in origins
+    )
+    return np.array(forecasts)

@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import ta
 import torch
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from statsmodels.tsa.seasonal import STL
 from torch.utils.data import DataLoader, TensorDataset
@@ -86,59 +85,41 @@ def add_cyclical_date_features(df):
     return df
 
 
-# Create training, validation, and testing datasets
-def get_train_val_test(data_X, data_y, n_past, n_future):
-    X, y = [], []
-    for i in range(len(data_X) - n_past - n_future + 1):
-        X.append(data_X[i : i + n_past])
-        y.append(data_y[i + n_past : i + n_past + n_future])
+def get_test_origins(n_rows, n_past, max_future, test_ratio=0.2):
+    # A forecast origin is the row index of the last input day of a window.
+    # Windows are cut using the longest horizon so that every horizon shares the same origins.
+    n_windows = n_rows - n_past - max_future + 1
+    n_test = int(round(n_windows * test_ratio))
+    return np.arange(n_windows - n_test, n_windows) + n_past - 1
 
-    X = np.array(X)
-    y = np.array(y)
 
-    X_test = X[-1:]
-    y_test = y[-1:]
+# Create chronological training, validation, and testing datasets
+def get_train_val_test(data_X, data_y, n_past, n_future, max_future=None, test_ratio=0.2, val_ratio=0.2):
+    if max_future is None:
+        max_future = n_future
+    data_y = np.asarray(data_y)
 
-    X_remaining = X[:-1]
-    y_remaining = y[:-1]
-    # Split remaining data into training and validation sets
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_remaining, y_remaining,
-        test_size=0.2,
-        shuffle=False
-    )
+    n_windows = len(data_X) - n_past - max_future + 1
+    X = np.array([data_X[i : i + n_past] for i in range(n_windows)])
+    y = np.array([data_y[i + n_past : i + n_past + n_future] for i in range(n_windows)])
+
+    # Test set: the last test_ratio of the windows
+    test_start = n_windows - len(get_test_origins(len(data_X), n_past, max_future, test_ratio))
+
+    # Leave a gap of n_future - 1 windows between splits so that no target overlaps a later split
+    gap = n_future - 1
+    n_remaining = test_start - gap
+    val_start = n_remaining - int(round(n_remaining * val_ratio))
+    train_end = val_start - gap
+
+    X_train, y_train = X[:train_end], y[:train_end]
+    X_val, y_val = X[val_start:n_remaining], y[val_start:n_remaining]
+    X_test, y_test = X[test_start:], y[test_start:]
     return X_train, y_train, X_val, y_val, X_test, y_test
 
 
-def get_recent_prediction_window(y, n_future, n_past=63, offset=21):
-    start = len(y) - n_past - offset
-    end = len(y) - offset
-    past_data = y[start:end].values
-
-    future_start = len(y) - offset
-    future_end = future_start + n_future
-    true_future = y.iloc[future_start:future_end].values
-
-    return past_data, true_future
-
-
-def normalize_datasets(X_train, y_train, X_val, y_val, X_test, y_test, non_cyclical_idx):
-    scaler_X = StandardScaler()
-    scaler_y = StandardScaler()
-
-    # Fit scalers on training data
-    scaler_X.fit(X_train[:, :, non_cyclical_idx].reshape(-1, len(non_cyclical_idx)))
-    scaler_y.fit(y_train.reshape(-1, 1))
-
-    for X_data, y_data in [(X_train, y_train), (X_val, y_val), (X_test, y_test)]:
-        # Normalize X
-        X_data[:, :, non_cyclical_idx] = scaler_X.transform(
-            X_data[:, :, non_cyclical_idx].reshape(-1, len(non_cyclical_idx))).reshape(X_data.shape[0], X_data.shape[1], len(non_cyclical_idx)
-        )
-        # Normalize y
-        y_data[:] = scaler_y.transform(y_data.reshape(-1, 1)).reshape(y_data.shape)
-
-    return X_train, y_train, X_val, y_val, X_test, y_test, scaler_X, scaler_y
+def get_past_window(series, origin, n_past=63):
+    return np.asarray(series)[origin - n_past + 1 : origin + 1]
 
 
 def normalize_data_correctly(X_train, X_val, X_test, y_train, y_val, y_test, non_cyclical_indices):
