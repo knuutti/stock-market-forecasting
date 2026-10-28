@@ -142,23 +142,35 @@ def select_stl_arima_orders(train_series, period=252, seasonal=13):
     return order_resid, order_trend
 
 
+def arima_forecast_with_fallback(series, order, n_future):
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        try:
+            return ARIMA(series, order=order).fit().forecast(steps=n_future), False
+        except np.linalg.LinAlgError:
+            # The default fit occasionally fails numerically; refit without the stationarity constraints
+            model = ARIMA(series, order=order, enforce_stationarity=False, enforce_invertibility=False)
+            return model.fit().forecast(steps=n_future), True
+
+
 def stl_arima_forecast_from_origin(history, n_future, order_resid, order_trend, period=252, seasonal=13):
     # STL is two-sided, so it is refitted on the history up to the origin only
     res = STL(history, period=period, seasonal=seasonal, robust=True).fit()
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        resid_forecast = ARIMA(res.resid, order=order_resid).fit().forecast(steps=n_future)
-        trend_forecast = ARIMA(res.trend, order=order_trend).fit().forecast(steps=n_future)
+    resid_forecast, resid_fallback = arima_forecast_with_fallback(res.resid, order_resid, n_future)
+    trend_forecast, trend_fallback = arima_forecast_with_fallback(res.trend, order_trend, n_future)
     # Seasonal forecast repeats the last observed seasonal cycle
     seasonal_forecast = np.asarray(res.seasonal)[-period:][:n_future]
-    return np.asarray(trend_forecast) + seasonal_forecast + np.asarray(resid_forecast)
+    forecast = np.asarray(trend_forecast) + seasonal_forecast + np.asarray(resid_forecast)
+    return forecast, resid_fallback or trend_fallback
 
 
 def rolling_stl_arima_forecast(series, origins, n_future, period=252, seasonal=13, n_jobs=-1):
     series = np.asarray(series, dtype=float)
     order_resid, order_trend = select_stl_arima_orders(series[:origins[0] + 1], period, seasonal)
-    forecasts = Parallel(n_jobs=n_jobs)(
+    outputs = Parallel(n_jobs=n_jobs)(
         delayed(stl_arima_forecast_from_origin)(series[:t + 1], n_future, order_resid, order_trend, period, seasonal)
         for t in origins
     )
+    forecasts, fallbacks = zip(*outputs)
+    print(f"Origins refitted without stationarity constraints: {sum(fallbacks)} of {len(origins)}")
     return np.array(forecasts)
